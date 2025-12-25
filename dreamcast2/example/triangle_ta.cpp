@@ -165,7 +165,7 @@ void transfer_region_array(uint32_t region_array_start,
   region_array[0].list_pointer.punch_through               = list_pointer::empty;
 }
 
-void main()
+int main()
 {
   /*
     a very simple memory map:
@@ -281,5 +281,7 @@ void main()
   // framebuffer.
   holly.FB_R_SOF1 = framebuffer_start;
 
+  for(;;);
   // return from main; this will effectively jump back to the serial loader
+  return 0;
 }

@@ -163,5 +163,5 @@ namespace holly {
   static_assert((offsetof (struct holly_reg, TA_OL_POINTERS)) == 0x600);
   static_assert((offsetof (struct holly_reg, PALETTE_RAM)) == 0x1000);
 
-  extern struct holly_reg holly __asm("holly");
+  static struct holly_reg& holly = *(holly_reg*)(0xa05f8000);
 }

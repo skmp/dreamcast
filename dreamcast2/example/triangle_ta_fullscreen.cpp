@@ -133,7 +133,7 @@ void transfer_ta_triangle()
   pref(end_of_list);
 }
 
-void main()
+int main()
 {
   /*
     a very simple memory map:
@@ -259,4 +259,7 @@ void main()
   holly.FB_R_SOF1 = framebuffer_start;
 
   // return from main; this will effectively jump back to the serial loader
+  for (;;);
+  
+  return 0;
 }

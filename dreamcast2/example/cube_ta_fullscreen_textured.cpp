@@ -15,6 +15,9 @@
 #include "sh7091/pref.hpp"
 #include "sh7091/store_queue_transfer.hpp"
 
+#include <cstdio>
+#include <dc/asic.h>
+
 void transfer_background_polygon(uint32_t isp_tsp_parameter_start)
 {
   using namespace holly::core::parameter;
@@ -95,10 +98,136 @@ static inline uint32_t transfer_ta_global_polygon(uint32_t store_queue_ix, uint3
   polygon->tsp_instruction_word = tsp_instruction_word::src_alpha_instr::one
                                 | tsp_instruction_word::dst_alpha_instr::zero
                                 | tsp_instruction_word::fog_control::no_fog
-                                | tsp_instruction_word::filter_mode::point_sampled
+                                | tsp_instruction_word::filter_mode::bilinear_filter
                                 | tsp_instruction_word::texture_shading_instruction::decal
                                 | tsp_instruction_word::texture_u_size::_256
                                 | tsp_instruction_word::texture_v_size::_256;
+
+  polygon->texture_control_word = texture_control_word::pixel_format::rgb565
+                                | texture_control_word::scan_order::non_twiddled
+                                | texture_control_word::texture_address(texture_address / 8);
+
+  // start store queue transfer of `polygon` to the TA
+  pref(polygon);
+
+  return store_queue_ix;
+}
+
+static inline uint32_t transfer_ta_global_polygon_quad(uint32_t store_queue_ix, uint32_t texture_address, uint32_t uv)
+{
+  using namespace holly::core::parameter;
+  using namespace holly::ta;
+  using namespace holly::ta::parameter;
+
+  //
+  // TA polygon global transfer
+  //
+
+  volatile global_parameter::polygon_type_0 * polygon = (volatile global_parameter::polygon_type_0 *)&store_queue[store_queue_ix];
+  store_queue_ix += (sizeof (global_parameter::polygon_type_0));
+
+  polygon->parameter_control_word = parameter_control_word::para_type::polygon_or_modifier_volume
+                                  | parameter_control_word::list_type::opaque
+                                  | parameter_control_word::col_type::packed_color
+                                  | parameter_control_word::texture;
+
+  polygon->isp_tsp_instruction_word = isp_tsp_instruction_word::depth_compare_mode::always
+                                    | isp_tsp_instruction_word::culling_mode::no_culling;
+  // Note that it is not possible to use
+  // ISP_TSP_INSTRUCTION_WORD::GOURAUD_SHADING in this isp_tsp_instruction_word,
+  // because `gouraud` is one of the bits overwritten by the value in
+  // parameter_control_word. See DCDBSysArc990907E.pdf page 200.
+
+  polygon->tsp_instruction_word = tsp_instruction_word::src_alpha_instr::one
+                                | tsp_instruction_word::dst_alpha_instr::zero
+                                | tsp_instruction_word::fog_control::no_fog
+                                | tsp_instruction_word::filter_mode::bilinear_filter
+                                | tsp_instruction_word::texture_shading_instruction::decal
+                                | uv;
+
+  polygon->texture_control_word = texture_control_word::pixel_format::rgb565
+                                | texture_control_word::scan_order::non_twiddled
+                                | texture_control_word::texture_address(texture_address / 8);
+
+  // start store queue transfer of `polygon` to the TA
+  pref(polygon);
+
+  return store_queue_ix;
+}
+
+static inline uint32_t transfer_ta_global_polygon_quad1(uint32_t store_queue_ix, uint32_t texture_address, uint32_t uv)
+{
+  using namespace holly::core::parameter;
+  using namespace holly::ta;
+  using namespace holly::ta::parameter;
+
+  //
+  // TA polygon global transfer
+  //
+
+  volatile global_parameter::polygon_type_0 * polygon = (volatile global_parameter::polygon_type_0 *)&store_queue[store_queue_ix];
+  store_queue_ix += (sizeof (global_parameter::polygon_type_0));
+
+  polygon->parameter_control_word = parameter_control_word::para_type::polygon_or_modifier_volume
+                                  | parameter_control_word::list_type::translucent
+                                  | parameter_control_word::col_type::packed_color
+                                  | parameter_control_word::texture;
+
+  polygon->isp_tsp_instruction_word = isp_tsp_instruction_word::depth_compare_mode::always
+                                    | isp_tsp_instruction_word::culling_mode::no_culling;
+  // Note that it is not possible to use
+  // ISP_TSP_INSTRUCTION_WORD::GOURAUD_SHADING in this isp_tsp_instruction_word,
+  // because `gouraud` is one of the bits overwritten by the value in
+  // parameter_control_word. See DCDBSysArc990907E.pdf page 200.
+
+  polygon->tsp_instruction_word = tsp_instruction_word::src_alpha_instr::one
+                                | tsp_instruction_word::dst_alpha_instr::zero
+                                | tsp_instruction_word::fog_control::no_fog
+                                | tsp_instruction_word::filter_mode::bilinear_filter
+                                | tsp_instruction_word::texture_shading_instruction::modulate
+                                | uv;
+
+  polygon->texture_control_word = texture_control_word::pixel_format::rgb565
+                                | texture_control_word::scan_order::non_twiddled
+                                | texture_control_word::texture_address(texture_address / 8);
+
+  // start store queue transfer of `polygon` to the TA
+  pref(polygon);
+
+  return store_queue_ix;
+}
+
+static inline uint32_t transfer_ta_global_polygon_quad2(uint32_t store_queue_ix, uint32_t texture_address, uint32_t uv)
+{
+  using namespace holly::core::parameter;
+  using namespace holly::ta;
+  using namespace holly::ta::parameter;
+
+  //
+  // TA polygon global transfer
+  //
+
+  volatile global_parameter::polygon_type_0 * polygon = (volatile global_parameter::polygon_type_0 *)&store_queue[store_queue_ix];
+  store_queue_ix += (sizeof (global_parameter::polygon_type_0));
+
+  polygon->parameter_control_word = parameter_control_word::para_type::polygon_or_modifier_volume
+                                  | parameter_control_word::list_type::translucent
+                                  | parameter_control_word::col_type::packed_color
+                                  | parameter_control_word::texture;
+
+  polygon->isp_tsp_instruction_word = isp_tsp_instruction_word::depth_compare_mode::always
+                                    | isp_tsp_instruction_word::culling_mode::no_culling;
+  // Note that it is not possible to use
+  // ISP_TSP_INSTRUCTION_WORD::GOURAUD_SHADING in this isp_tsp_instruction_word,
+  // because `gouraud` is one of the bits overwritten by the value in
+  // parameter_control_word. See DCDBSysArc990907E.pdf page 200.
+
+  polygon->tsp_instruction_word = tsp_instruction_word::src_alpha_instr::one
+                                | tsp_instruction_word::dst_alpha_instr::one
+                                | tsp_instruction_word::fog_control::no_fog
+                                | tsp_instruction_word::filter_mode::bilinear_filter
+                                | tsp_instruction_word::texture_shading_instruction::modulate
+                                | uv;
 
   polygon->texture_control_word = texture_control_word::pixel_format::rgb565
                                 | texture_control_word::scan_order::non_twiddled
@@ -240,6 +369,8 @@ static const int cube_faces_length = (sizeof (cube_faces)) / (sizeof (cube_faces
 #define sin(n) __builtin_sinf(n)
 
 static float theta = 0;
+static uint8_t shinnyiness = 0x40;
+static int8_t shinnyiness_dir = 1;
 
 static inline vec3 vertex_rotate(vec3 v)
 {
@@ -270,8 +401,8 @@ static inline vec3 vertex_perspective_divide(vec3 v)
 static inline vec3 vertex_screen_space(vec3 v)
 {
   return (vec3){
-    v.x * 240.f + 320.f,
-    v.y * 240.f + 240.f,
+    v.x * 256.f + 256.f,
+    v.y * 256.f + 256.f,
     v.z,
   };
 }
@@ -330,9 +461,93 @@ void transfer_ta_cube(uint32_t texture_address)
   store_queue_ix = transfer_ta_global_end_of_list(store_queue_ix);
 }
 
-const uint8_t texture[] __attribute__((aligned(4))) = {
-  #embed "texture/pavement_256x256.rgb565"
-};
+void transfer_ta_quad(float w, float h, uint32_t texture_address, uint32_t uv)
+{
+  {
+    using namespace sh7091;
+    using sh7091::sh7091;
+
+    // set the store queue destination address to the TA Polygon Converter FIFO
+    sh7091.CCN.QACR0 = sh7091::ccn::qacr0::address(ta_fifo_polygon_converter);
+    sh7091.CCN.QACR1 = sh7091::ccn::qacr1::address(ta_fifo_polygon_converter);
+  }
+
+  uint32_t store_queue_ix = 0;
+
+  store_queue_ix = transfer_ta_global_polygon_quad(store_queue_ix, texture_address, uv);
+
+  // vertex color is irrelevant in "decal" mode
+  uint32_t va_color = 0;
+  uint32_t vb_color = 0;
+  uint32_t vc_color = 0;
+
+  store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,
+                                                0, 0, 1, 0, 0, va_color,
+                                                w, 0, 1, 1, 0, vb_color,
+                                                w, h, 1, 1, 1, vc_color);
+                                                
+  store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,
+                                                0, 0, 1, 0, 0, va_color,
+                                                0, h, 1, 0, 1, vb_color,
+                                                w, h, 1, 1, 1, vc_color);
+
+  store_queue_ix = transfer_ta_global_end_of_list(store_queue_ix);
+}
+
+void transfer_ta_quad_dual(uint8_t shinniness, float w, float h, uint32_t texture_address, uint32_t uv, uint32_t texture_address2, uint32_t uv2)
+{
+  {
+    using namespace sh7091;
+    using sh7091::sh7091;
+
+    // set the store queue destination address to the TA Polygon Converter FIFO
+    sh7091.CCN.QACR0 = sh7091::ccn::qacr0::address(ta_fifo_polygon_converter);
+    sh7091.CCN.QACR1 = sh7091::ccn::qacr1::address(ta_fifo_polygon_converter);
+  }
+
+  uint32_t store_queue_ix = 0;
+
+  store_queue_ix = transfer_ta_global_polygon_quad1(store_queue_ix, texture_address, uv);
+
+  // vertex color is irrelevant in "decal" mode
+  uint32_t va_color = 0xCfCfCfCf;
+  uint32_t vb_color = 0xCfCfCfCf;
+  uint32_t vc_color = 0xCfCfCfCf;
+
+  store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,
+                                                0, 0, 1, 0, 0, va_color,
+                                                w, 0, 1, 1, 0, vb_color,
+                                                w, h, 1, 1, 1, vc_color);
+                                                
+  store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,
+                                                0, 0, 1, 0, 0, va_color,
+                                                0, h, 1, 0, 1, vb_color,
+                                                w, h, 1, 1, 1, vc_color);
+
+  store_queue_ix = transfer_ta_global_polygon_quad2(store_queue_ix, texture_address2, uv2);
+
+  va_color = (shinniness << 24) | (shinniness << 16) | (shinniness << 8) | (shinniness << 0);
+  vb_color = va_color;
+  vc_color = va_color;
+
+  store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,
+                                                -16, -12, 1, 0, 0, va_color,
+                                                w+16, -12, 1, 1, 0, vb_color,
+                                                w+16, h+12, 1, 1, 1, vc_color);
+                                                
+  store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,
+                                                -16, -12, 1, 0, 0, va_color,
+                                                -16, h+12, 1, 0, 1, vb_color,
+                                                w+16, h+12, 1, 1, 1, vc_color);
+
+  store_queue_ix = transfer_ta_global_end_of_list(store_queue_ix);
+}
+
+// const uint8_t texture[] __attribute__((aligned(4))) = {
+//   #embed "texture/pavement_256x256.rgb565"
+// };
+#include "texture/pavement_256x256.rgb565.h"
+#define texture example_texture_pavement_256x256_rgb565
 
 void transfer_texture(uint32_t texture_start)
 {
@@ -345,8 +560,45 @@ void transfer_texture(uint32_t texture_start)
   sh7091::store_queue_transfer::copy((void *)&texture_memory64[texture_start], texture, (sizeof (texture)));
 }
 
-void main()
+
+// #define HOLLY_NRM_INTSTAT   0xA05F6900
+// #define HOLLY_NRM_INTMASK  0xA05F6910
+// #define HOLLY_TA_END       (1<<7)
+// #define HOLLY_TA_END2       (1<<9)
+// #define HOLLY_RENDER_END  (1<<2)
+
+volatile uint32_t opaqs = 0;
+volatile uint32_t trans = 0;
+volatile uint32_t renders = 0;
+
+void int_handler(uint32 code, void *data) {
+  printf("IRQ: %ld\n", code);
+  if (code == ASIC_EVT_PVR_OPAQUEDONE) {
+    opaqs++;
+  }
+  if (code == ASIC_EVT_PVR_TRANSDONE) {
+    trans++;
+  }
+  if (code == ASIC_EVT_PVR_RENDERDONE_TSP) {
+    renders++;
+  }
+}
+
+int main()
 {
+    asic_evt_set_handler(ASIC_EVT_PVR_OPAQUEDONE, int_handler, NULL);
+    asic_evt_enable(ASIC_EVT_PVR_OPAQUEDONE, ASIC_IRQ_DEFAULT);
+    asic_evt_set_handler(ASIC_EVT_PVR_OPAQUEMODDONE, int_handler, NULL);
+    asic_evt_enable(ASIC_EVT_PVR_OPAQUEMODDONE, ASIC_IRQ_DEFAULT);
+    asic_evt_set_handler(ASIC_EVT_PVR_TRANSDONE, int_handler, NULL);
+    asic_evt_enable(ASIC_EVT_PVR_TRANSDONE, ASIC_IRQ_DEFAULT);
+    asic_evt_set_handler(ASIC_EVT_PVR_TRANSMODDONE, int_handler, NULL);
+    asic_evt_enable(ASIC_EVT_PVR_TRANSMODDONE, ASIC_IRQ_DEFAULT);
+    asic_evt_set_handler(ASIC_EVT_PVR_PTDONE, int_handler, NULL);
+    asic_evt_enable(ASIC_EVT_PVR_PTDONE, ASIC_IRQ_DEFAULT);
+    asic_evt_set_handler(ASIC_EVT_PVR_RENDERDONE_TSP, int_handler, NULL);
+    asic_evt_enable(ASIC_EVT_PVR_RENDERDONE_TSP, ASIC_IRQ_DEFAULT);
+    
   /*
     a very simple memory map:
 
@@ -360,6 +612,10 @@ void main()
 
   // these addresses are in "64-bit" texture memory address space:
   uint32_t texture_start           = 0x700000;
+  uint32_t rtt_start               = 0x720000;
+  uint32_t rtt_start_256           = rtt_start + 512 * 512 * 2;
+  uint32_t rtt_start_128           = rtt_start_256 + 256 * 256 * 2;
+  uint32_t rtt_start_64            = rtt_start_128 + 128 * 128 * 2;
 
   const int tile_y_num = 480 / 32;
   const int tile_x_num = 640 / 32;
@@ -368,6 +624,10 @@ void main()
 
   region_array::list_block_size list_block_size = {
     .opaque = 8 * 4,
+  };
+
+   region_array::list_block_size list_block_size2 = {
+    .translucent = 8 * 4,
   };
 
   region_array::transfer(tile_x_num,
@@ -447,6 +707,9 @@ void main()
   // address (and not relative to the beginning of texture memory).
   holly.PARAM_BASE = isp_tsp_parameter_start;
 
+  // Set tile fmt to v2
+  holly.FPU_PARAM_CFG |= 1 << 21;
+
   // Set the offset of the background ISP/TSP parameter, relative to PARAM_BASE
   // SKIP is related to the size of each vertex
   uint32_t background_offset = 0;
@@ -455,49 +718,385 @@ void main()
                       | isp_backgnd_t::tag_offset(0)
                       | isp_backgnd_t::skip(1);
 
-  // FB_W_SOF1 is the (texture memory-relative) address of the framebuffer that
-  // will be written to when a tile is rendered/flushed.
-  holly.FB_W_SOF1 = framebuffer_start;
-
+  holly.FB_R_CTRL = (holly.FB_R_CTRL & ~ (3 << 2)) | (1 << 2);
+  holly.FB_R_SIZE = (1 << 20) | (479 << 10) | (319 << 0);
   // without waiting for rendering to actually complete, immediately display the
   // framebuffer.
   holly.FB_R_SOF1 = framebuffer_start;
 
-  // draw 500 frames of cube rotation
-  for (int i = 0; i < 500; i++) {
+  // Make sure interrupt flags are clear
+  // *(volatile uint32_t*)HOLLY_NRM_INTSTAT = HOLLY_TA_END;
+  // *(volatile uint32_t*)HOLLY_NRM_INTSTAT = HOLLY_RENDER_END;
+
+  holly.FB_W_CTRL = ( 0 << 16 ) | ( 0 << 8 ) | (1 << 3) | 0x1;
+
+  // draw 5000 frames of cube rotation
+  for (int i = 0; i < 5000; i++) {
+  
     //////////////////////////////////////////////////////////////////////////////
-    // transfer cube to texture memory via the TA polygon converter FIFO
-    //////////////////////////////////////////////////////////////////////////////
-
-    // TA_LIST_INIT needs to be written (every frame) prior to the first FIFO
-    // write.
-    holly.TA_LIST_INIT = ta_list_init::list_init;
-
-    // dummy TA_LIST_INIT read; DCDBSysArc990907E.pdf in multiple places says this
-    // step is required.
-    (void)holly.TA_LIST_INIT;
-
-    transfer_ta_cube(texture_start);
-
-    //////////////////////////////////////////////////////////////////////////////
-    // wait for vertical synchronization (and the TA)
+    // wait for vertical synchronization
     //////////////////////////////////////////////////////////////////////////////
 
     while (!(spg_status::vsync(holly.SPG_STATUS)));
     while (spg_status::vsync(holly.SPG_STATUS));
 
+
+    holly.TA_ALLOC_CTRL = ta_alloc_ctrl::opb_mode::increasing_addresses
+                      | ta_alloc_ctrl::o_opb::_8x4byte;
+
     //////////////////////////////////////////////////////////////////////////////
-    // start the actual rasterization
+    // transfer cube to texture memory via the TA polygon converter FIFO
     //////////////////////////////////////////////////////////////////////////////
+
+    holly.TA_GLOB_TILE_CLIP = ta_glob_tile_clip::tile_y_num((512/32) - 1)
+                          | ta_glob_tile_clip::tile_x_num((512/32) - 1);
+
+
+    auto v = opaqs;
+    holly.TA_LIST_INIT = ta_list_init::list_init;
+    (void)holly.TA_LIST_INIT;
+
+    transfer_ta_cube(texture_start);
+
+    printf("Waiting for TA0\n");
+    // Wait for TA
+    { 
+      while (opaqs == v);
+    }
+
+    holly.FB_W_SOF1 = rtt_start | 0x1000000;
+    holly.FB_W_LINESTRIDE = 512 * 2 / 8;
+    holly.FB_X_CLIP = 0 | (511 << 16);
+    holly.FB_Y_CLIP = 0 | (511 << 16);
+    region_array::transfer(512/32, 512/32, list_block_size, region_array_start, object_list_start);
+    
+    v = renders;
+    holly.STARTRENDER = 1;
+    (void)holly.STARTRENDER;
+
+    printf("Waiting for CORE0\n");
+    { 
+      while (renders == v);
+    }
+
+    printf("STEP1\n");
+    // downsample to 256x256
+    {
+      holly.TA_GLOB_TILE_CLIP = ta_glob_tile_clip::tile_y_num((256/32) - 1)
+                            | ta_glob_tile_clip::tile_x_num((256/32) - 1);
+
+      v = opaqs;
+      holly.TA_LIST_INIT = ta_list_init::list_init;
+      (void)holly.TA_LIST_INIT;
+
+      using namespace holly::core::parameter;
+      transfer_ta_quad(256, 256, rtt_start, tsp_instruction_word::texture_u_size::_512 | tsp_instruction_word::texture_v_size::_512);
+
+      // Wait for TA
+      { 
+        while (opaqs == v);
+      }
+
+      // FB_W_SOF1 is the (texture memory-relative) address of the framebuffer that
+      // will be written to when a tile is rendered/flushed.
+      holly.FB_W_SOF1 = rtt_start_256 | 0x1000000;
+      holly.FB_W_LINESTRIDE = 256 * 2 / 8;
+      holly.FB_X_CLIP = 0 | (255 << 16);
+      holly.FB_Y_CLIP = 0 | (255 << 16);
+      region_array::transfer(256/32, 256/32, list_block_size, region_array_start, object_list_start);
+
+      // start the actual render--the rendering process begins by interpreting the
+      // region array
+      v = renders;
+      holly.STARTRENDER = 1;
+      (void)holly.STARTRENDER;
+
+      { 
+        while (renders == v);
+      }
+    }
+
+    printf("STEP2\n");
+    // downsample to 128x128
+    {
+      holly.TA_GLOB_TILE_CLIP = ta_glob_tile_clip::tile_y_num((128/32) - 1)
+                            | ta_glob_tile_clip::tile_x_num((128/32) - 1);
+
+      
+      v = opaqs;
+      holly.TA_LIST_INIT = ta_list_init::list_init;
+      (void)holly.TA_LIST_INIT;
+
+      using namespace holly::core::parameter;
+      transfer_ta_quad(128, 128, rtt_start_256, tsp_instruction_word::texture_u_size::_256 | tsp_instruction_word::texture_v_size::_256);
+
+      // Wait for TA
+      { 
+        while (opaqs == v);
+      }
+
+      // FB_W_SOF1 is the (texture memory-relative) address of the framebuffer that
+      // will be written to when a tile is rendered/flushed.
+      holly.FB_W_SOF1 = rtt_start_128 | 0x1000000;
+      holly.FB_W_LINESTRIDE = 128 * 2 / 8;
+      holly.FB_X_CLIP = 0 | (127 << 16);
+      holly.FB_Y_CLIP = 0 | (127 << 16);
+      region_array::transfer(128/32, 128/32, list_block_size, region_array_start, object_list_start);
+
+      // start the actual render--the rendering process begins by interpreting the
+      // region array
+      v = renders;
+      holly.STARTRENDER = 1;
+      (void)holly.STARTRENDER;
+
+      { 
+        while (renders == v);
+      }
+    }
+
+
+    printf("STEP3\n");
+    // downsample to 64x64
+    {
+      holly.TA_GLOB_TILE_CLIP = ta_glob_tile_clip::tile_y_num((64/32) - 1)
+                            | ta_glob_tile_clip::tile_x_num((64/32) - 1);
+
+      v = opaqs;
+      holly.TA_LIST_INIT = ta_list_init::list_init;
+      (void)holly.TA_LIST_INIT;
+
+      using namespace holly::core::parameter;
+      transfer_ta_quad(64, 64, rtt_start_128, tsp_instruction_word::texture_u_size::_128 | tsp_instruction_word::texture_v_size::_128);
+
+      // Wait for TA
+      { 
+        while (opaqs == v);
+      }
+
+      // FB_W_SOF1 is the (texture memory-relative) address of the framebuffer that
+      // will be written to when a tile is rendered/flushed.
+      holly.FB_W_SOF1 = rtt_start_64 | 0x1000000;
+      holly.FB_W_LINESTRIDE = 64 * 2 / 8;
+      holly.FB_X_CLIP = 0 | (63 << 16);
+      holly.FB_Y_CLIP = 0 | (63 << 16);
+      region_array::transfer(64/32, 64/32, list_block_size, region_array_start, object_list_start);
+
+      // start the actual render--the rendering process begins by interpreting the
+      // region array
+      v = renders;
+      holly.STARTRENDER = 1;
+      (void)holly.STARTRENDER;
+
+      { 
+        while (renders == v);
+      }
+    }
+
+    printf("STEP4\n");
+    // upsample to 128x128
+    {
+      holly.TA_GLOB_TILE_CLIP = ta_glob_tile_clip::tile_y_num((128/32) - 1)
+                            | ta_glob_tile_clip::tile_x_num((128/32) - 1);
+
+      v = opaqs;
+      holly.TA_LIST_INIT = ta_list_init::list_init;
+      (void)holly.TA_LIST_INIT;
+
+      using namespace holly::core::parameter;
+      transfer_ta_quad(128, 128, rtt_start_64, tsp_instruction_word::texture_u_size::_64 | tsp_instruction_word::texture_v_size::_64);
+
+      // Wait for TA
+      { 
+        while (opaqs == v);
+      }
+
+      // FB_W_SOF1 is the (texture memory-relative) address of the framebuffer that
+      // will be written to when a tile is rendered/flushed.
+      holly.FB_W_SOF1 = rtt_start_128 | 0x1000000;
+      holly.FB_W_LINESTRIDE = 128 * 2 / 8;
+      holly.FB_X_CLIP = 0 | (127 << 16);
+      holly.FB_Y_CLIP = 0 | (127 << 16);
+      region_array::transfer(128/32, 128/32, list_block_size, region_array_start, object_list_start);
+
+      // start the actual render--the rendering process begins by interpreting the
+      // region array
+      v = renders;
+      
+      holly.STARTRENDER = 1;
+      (void)holly.STARTRENDER;
+
+      { 
+        while (renders == v);
+      }
+    }
+
+    printf("STEP5\n");
+    // downsample to 64x64
+    {
+      holly.TA_GLOB_TILE_CLIP = ta_glob_tile_clip::tile_y_num((64/32) - 1)
+                            | ta_glob_tile_clip::tile_x_num((64/32) - 1);
+
+      v = opaqs;
+      holly.TA_LIST_INIT = ta_list_init::list_init;
+      (void)holly.TA_LIST_INIT;
+
+      using namespace holly::core::parameter;
+      transfer_ta_quad(64, 64, rtt_start_128, tsp_instruction_word::texture_u_size::_128 | tsp_instruction_word::texture_v_size::_128);
+
+      // Wait for TA
+      { 
+        while (opaqs == v);
+      }
+
+      // FB_W_SOF1 is the (texture memory-relative) address of the framebuffer that
+      // will be written to when a tile is rendered/flushed.
+      holly.FB_W_SOF1 = rtt_start_64 | 0x1000000;
+      holly.FB_W_LINESTRIDE = 64 * 2 / 8;
+      holly.FB_X_CLIP = 0 | (63 << 16);
+      holly.FB_Y_CLIP = 0 | (63 << 16);
+      region_array::transfer(64/32, 64/32, list_block_size, region_array_start, object_list_start);
+
+      // start the actual render--the rendering process begins by interpreting the
+      // region array
+      v = renders;
+      holly.STARTRENDER = 1;
+      (void)holly.STARTRENDER;
+
+      { 
+        while (renders == v);
+      }
+    }
+
+    printf("STEP6\n");
+    // upsample to 128x128
+    {
+      holly.TA_GLOB_TILE_CLIP = ta_glob_tile_clip::tile_y_num((128/32) - 1)
+                            | ta_glob_tile_clip::tile_x_num((128/32) - 1);
+
+      v = opaqs;
+      holly.TA_LIST_INIT = ta_list_init::list_init;
+      (void)holly.TA_LIST_INIT;
+
+      using namespace holly::core::parameter;
+      transfer_ta_quad(128, 128, rtt_start_64, tsp_instruction_word::texture_u_size::_64 | tsp_instruction_word::texture_v_size::_64);
+
+      // Wait for TA
+      { 
+        while (opaqs == v);
+      }
+
+      // FB_W_SOF1 is the (texture memory-relative) address of the framebuffer that
+      // will be written to when a tile is rendered/flushed.
+      holly.FB_W_SOF1 = rtt_start_128 | 0x1000000;
+      holly.FB_W_LINESTRIDE = 128 * 2 / 8;
+      holly.FB_X_CLIP = 0 | (127 << 16);
+      holly.FB_Y_CLIP = 0 | (127 << 16);
+      region_array::transfer(128/32, 128/32, list_block_size, region_array_start, object_list_start);
+
+      // start the actual render--the rendering process begins by interpreting the
+      // region array
+      v = renders;
+      holly.STARTRENDER = 1;
+      (void)holly.STARTRENDER;
+
+      { 
+        while (renders == v);
+      }
+    }
+
+    printf("STEP7\n");
+    // downsample to 64x64
+    {
+      holly.TA_GLOB_TILE_CLIP = ta_glob_tile_clip::tile_y_num((64/32) - 1)
+                            | ta_glob_tile_clip::tile_x_num((64/32) - 1);
+
+      v = opaqs;
+      holly.TA_LIST_INIT = ta_list_init::list_init;
+      (void)holly.TA_LIST_INIT;
+
+      using namespace holly::core::parameter;
+      transfer_ta_quad(64, 64, rtt_start_128, tsp_instruction_word::texture_u_size::_128 | tsp_instruction_word::texture_v_size::_128);
+
+      // Wait for TA
+      { 
+        while (opaqs == v);
+      }
+
+      // FB_W_SOF1 is the (texture memory-relative) address of the framebuffer that
+      // will be written to when a tile is rendered/flushed.
+      holly.FB_W_SOF1 = rtt_start_64 | 0x1000000;
+      holly.FB_W_LINESTRIDE = 64 * 2 / 8;
+      holly.FB_X_CLIP = 0 | (63 << 16);
+      holly.FB_Y_CLIP = 0 | (63 << 16);
+      region_array::transfer(64/32, 64/32, list_block_size, region_array_start, object_list_start);
+
+      // start the actual render--the rendering process begins by interpreting the
+      // region array
+      v = renders;
+      holly.STARTRENDER = 1;
+      (void)holly.STARTRENDER;
+
+      { 
+        while (renders == v);
+      }
+    }
+
+    printf("STEP8\n");
+    // final render pass
+    // Draw the quad
+
+    holly.TA_ALLOC_CTRL = ta_alloc_ctrl::opb_mode::increasing_addresses
+                      | ta_alloc_ctrl::t_opb::_8x4byte;
+
+    holly.TA_GLOB_TILE_CLIP = ta_glob_tile_clip::tile_y_num((480/32) - 1)
+                          | ta_glob_tile_clip::tile_x_num((640/32) - 1);
+
+    v = trans;
+    holly.TA_LIST_INIT = ta_list_init::list_init;
+    (void)holly.TA_LIST_INIT;
+
+    using namespace holly::core::parameter;
+    transfer_ta_quad_dual(shinnyiness, 640, 480, rtt_start, tsp_instruction_word::texture_u_size::_512 | tsp_instruction_word::texture_v_size::_512,
+                                    rtt_start_64, tsp_instruction_word::texture_u_size::_64 | tsp_instruction_word::texture_v_size::_64);
+
+    // Wait for TA
+    { 
+      while (trans == v);
+    }
+
+    // FB_W_SOF1 is the (texture memory-relative) address of the framebuffer that
+    // will be written to when a tile is rendered/flushed.
+    holly.FB_W_SOF1 = framebuffer_start;
+    holly.FB_W_LINESTRIDE = 640 * 2 / 8;
+    holly.FB_X_CLIP = 0 | (639 << 16);
+    holly.FB_Y_CLIP = 0 | (479 << 16);
+    region_array::transfer(640/32, 480/32, list_block_size2, region_array_start, object_list_start);
 
     // start the actual render--the rendering process begins by interpreting the
     // region array
+    v = renders;
     holly.STARTRENDER = 1;
+    (void)holly.STARTRENDER;
+
+    { 
+      while (renders == v);
+    }
+
+    printf("DONE\n");
 
     // increment theta for the cube rotation animation
     // (used by the `vertex_rotate` function)
     theta += 0.01f;
+
+    shinnyiness += shinnyiness_dir;
+
+    if (shinnyiness ==255 ) {
+      shinnyiness_dir = -1;
+    } else if (shinnyiness < 0x41) {
+      shinnyiness_dir = 1;
+    }
   }
 
   // return from main; this will effectively jump back to the serial loader
+  return 0;
 }

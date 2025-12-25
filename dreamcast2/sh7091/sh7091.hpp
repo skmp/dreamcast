@@ -362,5 +362,5 @@ namespace sh7091 {
   static_assert((offsetof (struct sh7091_reg, SCIF)) == 0xe80000);
   static_assert((offsetof (struct sh7091_reg, UDI)) == 0xf00000);
 
-  extern struct sh7091_reg sh7091 __asm("sh7091");
+  static struct sh7091_reg& sh7091 =*(struct sh7091_reg*)(0xff000000);
 }
