@@ -38,17 +38,17 @@ void transfer_background_polygon(uint32_t isp_tsp_parameter_start)
   polygon->vertex[0].x =  0.0f;
   polygon->vertex[0].y =  0.0f;
   polygon->vertex[0].z =  0.00001f;
-  polygon->vertex[0].base_color = 0xff00ff;
+  polygon->vertex[0].base_color = 0;
 
   polygon->vertex[1].x = 32.0f;
   polygon->vertex[1].y =  0.0f;
   polygon->vertex[1].z =  0.00001f;
-  polygon->vertex[1].base_color = 0xff00ff;
+  polygon->vertex[1].base_color = 0;
 
   polygon->vertex[2].x = 32.0f;
   polygon->vertex[2].y = 32.0f;
   polygon->vertex[2].z =  0.00001f;
-  polygon->vertex[2].base_color = 0xff00ff;
+  polygon->vertex[2].base_color = 0;
 }
 
 static inline uint32_t transfer_ta_global_end_of_list(uint32_t store_queue_ix)
@@ -99,7 +99,7 @@ static inline uint32_t transfer_ta_global_polygon(uint32_t store_queue_ix, uint3
                                 | tsp_instruction_word::dst_alpha_instr::zero
                                 | tsp_instruction_word::fog_control::no_fog
                                 | tsp_instruction_word::filter_mode::bilinear_filter
-                                | tsp_instruction_word::texture_shading_instruction::decal
+                                | tsp_instruction_word::texture_shading_instruction::modulate
                                 | tsp_instruction_word::texture_u_size::_256
                                 | tsp_instruction_word::texture_v_size::_256;
 
@@ -181,7 +181,7 @@ static inline uint32_t transfer_ta_global_polygon_quad1(uint32_t store_queue_ix,
   // parameter_control_word. See DCDBSysArc990907E.pdf page 200.
 
   polygon->tsp_instruction_word = tsp_instruction_word::src_alpha_instr::one
-                                | tsp_instruction_word::dst_alpha_instr::zero
+                                | tsp_instruction_word::dst_alpha_instr::one
                                 | tsp_instruction_word::fog_control::no_fog
                                 | tsp_instruction_word::filter_mode::bilinear_filter
                                 | tsp_instruction_word::texture_shading_instruction::modulate
@@ -198,6 +198,49 @@ static inline uint32_t transfer_ta_global_polygon_quad1(uint32_t store_queue_ix,
 }
 
 static inline uint32_t transfer_ta_global_polygon_quad2(uint32_t store_queue_ix, uint32_t texture_address, uint32_t uv)
+{
+  using namespace holly::core::parameter;
+  using namespace holly::ta;
+  using namespace holly::ta::parameter;
+
+  //
+  // TA polygon global transfer
+  //
+
+  volatile global_parameter::polygon_type_0 * polygon = (volatile global_parameter::polygon_type_0 *)&store_queue[store_queue_ix];
+  store_queue_ix += (sizeof (global_parameter::polygon_type_0));
+
+  polygon->parameter_control_word = parameter_control_word::para_type::polygon_or_modifier_volume
+                                  | parameter_control_word::list_type::translucent
+                                  | parameter_control_word::col_type::packed_color
+                                  | parameter_control_word::texture;
+
+  polygon->isp_tsp_instruction_word = isp_tsp_instruction_word::depth_compare_mode::always
+                                    | isp_tsp_instruction_word::culling_mode::no_culling;
+  // Note that it is not possible to use
+  // ISP_TSP_INSTRUCTION_WORD::GOURAUD_SHADING in this isp_tsp_instruction_word,
+  // because `gouraud` is one of the bits overwritten by the value in
+  // parameter_control_word. See DCDBSysArc990907E.pdf page 200.
+
+  polygon->tsp_instruction_word = tsp_instruction_word::src_alpha_instr::one
+                                | tsp_instruction_word::dst_alpha_instr::zero
+                                | tsp_instruction_word::fog_control::no_fog
+                                | tsp_instruction_word::filter_mode::bilinear_filter
+                                | tsp_instruction_word::texture_shading_instruction::modulate
+                                | uv;
+
+  polygon->texture_control_word = texture_control_word::pixel_format::rgb565
+                                | texture_control_word::scan_order::non_twiddled
+                                | texture_control_word::texture_address(texture_address / 8);
+
+  // start store queue transfer of `polygon` to the TA
+  pref(polygon);
+
+  return store_queue_ix;
+}
+
+
+static inline uint32_t transfer_ta_global_polygon_quad3(uint32_t store_queue_ix, uint32_t texture_address, uint32_t uv)
 {
   using namespace holly::core::parameter;
   using namespace holly::ta;
@@ -369,7 +412,7 @@ static const int cube_faces_length = (sizeof (cube_faces)) / (sizeof (cube_faces
 #define sin(n) __builtin_sinf(n)
 
 static float theta = 0;
-static uint8_t shinnyiness = 0x40;
+static uint8_t shinnyiness = 0;
 static int8_t shinnyiness_dir = 1;
 
 static inline vec3 vertex_rotate(vec3 v)
@@ -407,7 +450,7 @@ static inline vec3 vertex_screen_space(vec3 v)
   };
 }
 
-void transfer_ta_cube(uint32_t texture_address)
+void transfer_ta_cube(uint8_t light, uint32_t texture_address)
 {
   {
     using namespace sh7091;
@@ -448,9 +491,9 @@ void transfer_ta_cube(uint32_t texture_address)
     vec2 vtc = cube_vertex_texture[itc];
 
     // vertex color is irrelevant in "decal" mode
-    uint32_t va_color = 0;
-    uint32_t vb_color = 0;
-    uint32_t vc_color = 0;
+    uint32_t va_color = (light << 24) | (light << 16) | (light << 8) | (light << 0);
+    uint32_t vb_color = va_color;
+    uint32_t vc_color = va_color;
 
     store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,
                                                  vpa.x, vpa.y, vpa.z, vta.u, vta.v, va_color,
@@ -507,12 +550,46 @@ void transfer_ta_quad_dual(uint8_t shinniness, float w, float h, uint32_t textur
 
   uint32_t store_queue_ix = 0;
 
-  store_queue_ix = transfer_ta_global_polygon_quad1(store_queue_ix, texture_address, uv);
-
   // vertex color is irrelevant in "decal" mode
   uint32_t va_color = 0xCfCfCfCf;
   uint32_t vb_color = 0xCfCfCfCf;
   uint32_t vc_color = 0xCfCfCfCf;
+
+  va_color = 0xFFFFFFFF;
+  vb_color = va_color;
+  vc_color = va_color;
+
+  float ox = 16;
+  float oy = 12;
+
+  store_queue_ix = transfer_ta_global_polygon_quad2(store_queue_ix, texture_address2, uv2);
+
+  store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,
+                                                -ox, -oy, 1, 0, 0, va_color,
+                                                w+ox, -oy, 1, 1, 0, vb_color,
+                                                w+ox, h+oy, 1, 1, 1, vc_color);
+                                                
+  store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,
+                                                -ox, -oy, 1, 0, 0, va_color,
+                                                -ox, h+oy, 1, 0, 1, vb_color,
+                                                w+ox, h+oy, 1, 1, 1, vc_color);
+
+  store_queue_ix = transfer_ta_global_polygon_quad3(store_queue_ix, texture_address2, uv2);
+  store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,
+                                                -ox, -oy, 1, 0, 0, va_color,
+                                                w+ox, -oy, 1, 1, 0, vb_color,
+                                                w+ox, h+oy, 1, 1, 1, vc_color);
+                                                
+  store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,
+                                                -ox, -oy, 1, 0, 0, va_color,
+                                                -ox, h+oy, 1, 0, 1, vb_color,
+                                                w+ox, h+oy, 1, 1, 1, vc_color);
+
+  store_queue_ix = transfer_ta_global_polygon_quad1(store_queue_ix, texture_address, uv);
+
+  va_color = 0xFFFFFFFF; // (shinniness << 24) | (shinniness << 16) | (shinniness << 8) | (shinniness << 0);
+  vb_color = va_color;
+  vc_color = va_color;
 
   store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,
                                                 0, 0, 1, 0, 0, va_color,
@@ -523,22 +600,6 @@ void transfer_ta_quad_dual(uint8_t shinniness, float w, float h, uint32_t textur
                                                 0, 0, 1, 0, 0, va_color,
                                                 0, h, 1, 0, 1, vb_color,
                                                 w, h, 1, 1, 1, vc_color);
-
-  store_queue_ix = transfer_ta_global_polygon_quad2(store_queue_ix, texture_address2, uv2);
-
-  va_color = (shinniness << 24) | (shinniness << 16) | (shinniness << 8) | (shinniness << 0);
-  vb_color = va_color;
-  vc_color = va_color;
-
-  store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,
-                                                -16, -12, 1, 0, 0, va_color,
-                                                w+16, -12, 1, 1, 0, vb_color,
-                                                w+16, h+12, 1, 1, 1, vc_color);
-                                                
-  store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,
-                                                -16, -12, 1, 0, 0, va_color,
-                                                -16, h+12, 1, 0, 1, vb_color,
-                                                w+16, h+12, 1, 1, 1, vc_color);
 
   store_queue_ix = transfer_ta_global_end_of_list(store_queue_ix);
 }
@@ -572,7 +633,7 @@ volatile uint32_t trans = 0;
 volatile uint32_t renders = 0;
 
 void int_handler(uint32 code, void *data) {
-  printf("IRQ: %ld\n", code);
+  // printf("IRQ: %ld\n", code);
   if (code == ASIC_EVT_PVR_OPAQUEDONE) {
     opaqs++;
   }
@@ -616,6 +677,7 @@ int main()
   uint32_t rtt_start_256           = rtt_start + 512 * 512 * 2;
   uint32_t rtt_start_128           = rtt_start_256 + 256 * 256 * 2;
   uint32_t rtt_start_64            = rtt_start_128 + 128 * 128 * 2;
+  uint32_t rtt_start_32            = rtt_start_64 + 64 * 64 * 2;
 
   const int tile_y_num = 480 / 32;
   const int tile_x_num = 640 / 32;
@@ -728,11 +790,14 @@ int main()
   // *(volatile uint32_t*)HOLLY_NRM_INTSTAT = HOLLY_TA_END;
   // *(volatile uint32_t*)HOLLY_NRM_INTSTAT = HOLLY_RENDER_END;
 
-  holly.FB_W_CTRL = ( 0 << 16 ) | ( 0 << 8 ) | (1 << 3) | 0x1;
+  holly.HALF_OFFSET = 7;
 
   // draw 5000 frames of cube rotation
   for (int i = 0; i < 5000; i++) {
   
+    // Dither On for initial rtt
+    holly.FB_W_CTRL = ( 0 << 16 ) | ( 0 << 8 ) | (1 << 3) | 0x1;
+
     //////////////////////////////////////////////////////////////////////////////
     // wait for vertical synchronization
     //////////////////////////////////////////////////////////////////////////////
@@ -748,7 +813,7 @@ int main()
     // transfer cube to texture memory via the TA polygon converter FIFO
     //////////////////////////////////////////////////////////////////////////////
 
-    holly.TA_GLOB_TILE_CLIP = ta_glob_tile_clip::tile_y_num((512/32) - 1)
+    holly.TA_GLOB_TILE_CLIP = ta_glob_tile_clip::tile_y_num((480/32) - 1)
                           | ta_glob_tile_clip::tile_x_num((512/32) - 1);
 
 
@@ -756,9 +821,9 @@ int main()
     holly.TA_LIST_INIT = ta_list_init::list_init;
     (void)holly.TA_LIST_INIT;
 
-    transfer_ta_cube(texture_start);
+    transfer_ta_cube(shinnyiness, texture_start);
 
-    printf("Waiting for TA0\n");
+    // printf("Waiting for TA0\n");
     // Wait for TA
     { 
       while (opaqs == v);
@@ -768,18 +833,18 @@ int main()
     holly.FB_W_LINESTRIDE = 512 * 2 / 8;
     holly.FB_X_CLIP = 0 | (511 << 16);
     holly.FB_Y_CLIP = 0 | (511 << 16);
-    region_array::transfer(512/32, 512/32, list_block_size, region_array_start, object_list_start);
+    region_array::transfer(512/32, 480/32, list_block_size, region_array_start, object_list_start);
     
     v = renders;
     holly.STARTRENDER = 1;
     (void)holly.STARTRENDER;
 
-    printf("Waiting for CORE0\n");
+    // printf("Waiting for CORE0\n");
     { 
       while (renders == v);
     }
 
-    printf("STEP1\n");
+    // printf("STEP1\n");
     // downsample to 256x256
     {
       holly.TA_GLOB_TILE_CLIP = ta_glob_tile_clip::tile_y_num((256/32) - 1)
@@ -816,7 +881,7 @@ int main()
       }
     }
 
-    printf("STEP2\n");
+    // printf("STEP2\n");
     // downsample to 128x128
     {
       holly.TA_GLOB_TILE_CLIP = ta_glob_tile_clip::tile_y_num((128/32) - 1)
@@ -855,7 +920,7 @@ int main()
     }
 
 
-    printf("STEP3\n");
+    // printf("STEP3\n");
     // downsample to 64x64
     {
       holly.TA_GLOB_TILE_CLIP = ta_glob_tile_clip::tile_y_num((64/32) - 1)
@@ -892,7 +957,11 @@ int main()
       }
     }
 
-    printf("STEP4\n");
+    // Iterative Downsamples aren't dithered
+    holly.FB_W_CTRL = ( 0 << 16 ) | ( 0 << 8 ) | (0 << 3) | 0x1;
+
+
+    // printf("STEP4\n");
     // upsample to 128x128
     {
       holly.TA_GLOB_TILE_CLIP = ta_glob_tile_clip::tile_y_num((128/32) - 1)
@@ -930,7 +999,7 @@ int main()
       }
     }
 
-    printf("STEP5\n");
+    // printf("STEP5\n");
     // downsample to 64x64
     {
       holly.TA_GLOB_TILE_CLIP = ta_glob_tile_clip::tile_y_num((64/32) - 1)
@@ -967,7 +1036,7 @@ int main()
       }
     }
 
-    printf("STEP6\n");
+    // printf("STEP6\n");
     // upsample to 128x128
     {
       holly.TA_GLOB_TILE_CLIP = ta_glob_tile_clip::tile_y_num((128/32) - 1)
@@ -1004,7 +1073,7 @@ int main()
       }
     }
 
-    printf("STEP7\n");
+    // printf("STEP7\n");
     // downsample to 64x64
     {
       holly.TA_GLOB_TILE_CLIP = ta_glob_tile_clip::tile_y_num((64/32) - 1)
@@ -1041,9 +1110,12 @@ int main()
       }
     }
 
-    printf("STEP8\n");
+    // printf("STEP8\n");
     // final render pass
     // Draw the quad
+
+    // Dither On for Final Render
+    holly.FB_W_CTRL = ( 0 << 16 ) | ( 0 << 8 ) | (1 << 3) | 0x1;
 
     holly.TA_ALLOC_CTRL = ta_alloc_ctrl::opb_mode::increasing_addresses
                       | ta_alloc_ctrl::t_opb::_8x4byte;
@@ -1082,7 +1154,7 @@ int main()
       while (renders == v);
     }
 
-    printf("DONE\n");
+    // printf("DONE\n");
 
     // increment theta for the cube rotation animation
     // (used by the `vertex_rotate` function)
@@ -1092,7 +1164,7 @@ int main()
 
     if (shinnyiness ==255 ) {
       shinnyiness_dir = -1;
-    } else if (shinnyiness < 0x41) {
+    } else if (shinnyiness < 1) {
       shinnyiness_dir = 1;
     }
   }
