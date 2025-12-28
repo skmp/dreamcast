@@ -623,6 +623,64 @@ void transfer_ta_quad(float w, float h, uint32_t texture_address, uint32_t uv, b
   store_queue_ix = transfer_ta_global_end_of_list(store_queue_ix);
 }
 
+void transfer_ta_quad_sub(float w, float h, uint32_t texture_address, uint32_t uv, bool untwiddled = true)
+{
+  using namespace holly::core::parameter;
+  using namespace holly::ta;
+  using namespace holly::ta::parameter;
+
+  {
+    using namespace sh7091;
+    using sh7091::sh7091;
+
+    // set the store queue destination address to the TA Polygon Converter FIFO
+    sh7091.CCN.QACR0 = sh7091::ccn::qacr0::address(ta_fifo_polygon_converter);
+    sh7091.CCN.QACR1 = sh7091::ccn::qacr1::address(ta_fifo_polygon_converter);
+  }
+
+  uint32_t store_queue_ix = 0;
+
+  
+
+  // vertex color is irrelevant in "decal" mode
+  uint32_t va_color = 0xFFFFFFFF;
+  uint32_t vb_color = 0xFFFFFFFF;
+  uint32_t vc_color = 0xFFFFFFFF;
+
+  // ACUM = COL
+  store_queue_ix = transfer_ta_global_polygon_quad_f(store_queue_ix, texture_address, uv, tsp_instruction_word::src_alpha_instr::one | tsp_instruction_word::dst_alpha_instr::zero | tsp_instruction_word::dst_select::secondary_accumulation_buffer);
+  store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,0, 0, 1, 0, 0, va_color,w, 0, 1, 1, 0, vb_color,w, h, 1, 1, 1, vc_color);
+  store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,0, 0, 1, 0, 0, va_color,0, h, 1, 0, 1, vb_color,w, h, 1, 1, 1, vc_color);
+
+  // DST = 1
+  store_queue_ix = transfer_ta_global_polygon_quad_f(store_queue_ix, texture_address, uv, tsp_instruction_word::src_alpha_instr::one | tsp_instruction_word::dst_alpha_instr::zero, false);
+  store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,0, 0, 1, 0, 0, va_color,w, 0, 1, 1, 0, vb_color,w, h, 1, 1, 1, vc_color);
+  store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,0, 0, 1, 0, 0, va_color,0, h, 1, 0, 1, vb_color,w, h, 1, 1, 1, vc_color);
+
+  // // DST = 0 * ACUM + [DST:1]*(1 - ACUM) = 1 - ACUM = 1 - COL
+  store_queue_ix = transfer_ta_global_polygon_quad_f(store_queue_ix, texture_address, uv, tsp_instruction_word::src_alpha_instr::zero | tsp_instruction_word::dst_alpha_instr::inverse_other_color | tsp_instruction_word::src_select::secondary_accumulation_buffer, false);
+  store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,0, 0, 1, 0, 0, va_color,w, 0, 1, 1, 0, vb_color,w, h, 1, 1, 1, vc_color);
+  store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,0, 0, 1, 0, 0, va_color,0, h, 1, 0, 1, vb_color,w, h, 1, 1, 1, vc_color);
+
+  va_color = 0x80808080;
+  vb_color = 0x80808080;
+  vc_color = 0x80808080;
+  // // DST =  1 * DST + (DST) * SRC(=1)
+  store_queue_ix = transfer_ta_global_polygon_quad_f(store_queue_ix, texture_address, uv, tsp_instruction_word::src_alpha_instr::other_color | tsp_instruction_word::dst_alpha_instr::one, false);
+  store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,0, 0, 1, 0, 0, va_color,w, 0, 1, 1, 0, vb_color,w, h, 1, 1, 1, vc_color);
+  store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,0, 0, 1, 0, 0, va_color,0, h, 1, 0, 1, vb_color,w, h, 1, 1, 1, vc_color);
+
+  va_color = 0xFFFFFFFF;
+  vb_color = 0xFFFFFFFF;
+  vc_color = 0xFFFFFFFF;
+  // // DST = 0 * DST + (1-DST) * 1
+  store_queue_ix = transfer_ta_global_polygon_quad_f(store_queue_ix, texture_address, uv, tsp_instruction_word::src_alpha_instr::inverse_other_color | tsp_instruction_word::dst_alpha_instr::zero, false);
+  store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,0, 0, 1, 0, 0, va_color,w, 0, 1, 1, 0, vb_color,w, h, 1, 1, 1, vc_color);
+  store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,0, 0, 1, 0, 0, va_color,0, h, 1, 0, 1, vb_color,w, h, 1, 1, 1, vc_color);
+
+  store_queue_ix = transfer_ta_global_end_of_list(store_queue_ix);
+}
+
 void transfer_ta_quad_dual(uint8_t shinniness, float w, float h, uint32_t texture_address, uint32_t uv, uint32_t texture_address2, uint32_t uv2)
 {
   {
@@ -971,6 +1029,7 @@ int main()
   uint32_t rtt_start_128           = rtt_start_256 + 256 * 256 * 2;
   uint32_t rtt_start_128tw         = rtt_start_128 + 128 * 128 * 2;
   uint32_t rtt_start_64            = rtt_start_128tw + 128 * 128 * 2;
+  uint32_t rtt_start_64sub         = rtt_start_64 + 64 * 64 * 2;
 
   const int tile_y_num = 480 / 32;
   const int tile_x_num = 640 / 32;
@@ -1405,6 +1464,45 @@ int main()
       }
     }
 
+    // Substract 128 and rescale to 255
+    {
+      holly.TA_ALLOC_CTRL = ta_alloc_ctrl::opb_mode::increasing_addresses
+                      | ta_alloc_ctrl::t_opb::_8x4byte;
+
+      holly.TA_GLOB_TILE_CLIP = ta_glob_tile_clip::tile_y_num((64/32) - 1)
+                            | ta_glob_tile_clip::tile_x_num((64/32) - 1);
+
+      v = trans;
+      holly.TA_LIST_INIT = ta_list_init::list_init;
+      (void)holly.TA_LIST_INIT;
+
+      using namespace holly::core::parameter;
+      transfer_ta_quad_sub(64, 64, rtt_start_64, tsp_instruction_word::texture_u_size::_64 | tsp_instruction_word::texture_v_size::_64);
+      // transfer_ta_quad(64, 64, rtt_start_64, tsp_instruction_word::texture_u_size::_64 | tsp_instruction_word::texture_v_size::_64);
+
+      // Wait for TA
+      { 
+        while (trans == v);
+      }
+
+      // FB_W_SOF1 is the (texture memory-relative) address of the framebuffer that
+      // will be written to when a tile is rendered/flushed.
+      holly.FB_W_SOF1 = rtt_start_64sub | 0x1000000;
+      holly.FB_W_LINESTRIDE = 64 * 2 / 8;
+      holly.FB_X_CLIP = 0 | (63 << 16);
+      holly.FB_Y_CLIP = 0 | (63 << 16);
+      region_array::transfer(64/32, 64/32, list_block_size2, region_array_start, object_list_start);
+
+      // start the actual render--the rendering process begins by interpreting the
+      // region array
+      v = renders;
+      holly.STARTRENDER = 1;
+      (void)holly.STARTRENDER;
+
+      { 
+        while (renders == v);
+      }
+    }
     // step7a
     // upsample to 128x128
     {
@@ -1419,7 +1517,7 @@ int main()
       (void)holly.TA_LIST_INIT;
 
       using namespace holly::core::parameter;
-      transfer_ta_quad(128, 128, rtt_start_64, tsp_instruction_word::texture_u_size::_64 | tsp_instruction_word::texture_v_size::_64);
+      transfer_ta_quad(128, 128, rtt_start_64sub, tsp_instruction_word::texture_u_size::_64 | tsp_instruction_word::texture_v_size::_64);
 
       // Wait for TA
       { 

@@ -25,7 +25,8 @@ namespace holly::core::region_array {
         //int rix = y * tile_width + x;
 
         region_array[rix].tile = tile::y_position(y)
-                              | tile::x_position(x);
+                              | tile::x_position(x)
+                              | tile::pre_sort;
 
         if (y == (tile_height - 1) && x == (tile_width - 1))
           region_array[rix].tile |= tile::last_region;
