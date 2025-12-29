@@ -1513,7 +1513,7 @@ int main()
     // upsample to 128x128
     {
       holly.TA_ALLOC_CTRL = ta_alloc_ctrl::opb_mode::increasing_addresses
-                      | ta_alloc_ctrl::t_opb::_8x4byte;
+                      | ta_alloc_ctrl::o_opb::_8x4byte;
 
       holly.TA_GLOB_TILE_CLIP = ta_glob_tile_clip::tile_y_num((128/32) - 1)
                             | ta_glob_tile_clip::tile_x_num((128/32) - 1);

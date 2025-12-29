@@ -674,14 +674,14 @@ void transfer_ta_quad_sub(float w, float h, uint32_t texture_address, uint32_t u
   store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,0, 0, 1, 0, 0, va_color,w, 0, 1, 1, 0, vb_color,w, h, 1, 1, 1, vc_color);
   store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,0, 0, 1, 0, 0, va_color,0, h, 1, 0, 1, vb_color,w, h, 1, 1, 1, vc_color);
 
-  // // DST = (1-COL) * DST + 0 * SRC
-  // store_queue_ix = transfer_ta_global_polygon_quad_f(store_queue_ix, texture_address, uv, tsp_instruction_word::src_alpha_instr::zero | tsp_instruction_word::dst_alpha_instr::inverse_other_color);
-  // store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,0, 0, 1, 0, 0, va_color,w, 0, 1, 1, 0, vb_color,w, h, 1, 1, 1, vc_color);
-  // store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,0, 0, 1, 0, 0, va_color,0, h, 1, 0, 1, vb_color,w, h, 1, 1, 1, vc_color);
+  // DST = (1-COL) * DST + 0 * SRC
+  store_queue_ix = transfer_ta_global_polygon_quad_f(store_queue_ix, texture_address, uv, tsp_instruction_word::src_alpha_instr::zero | tsp_instruction_word::dst_alpha_instr::inverse_other_color);
+  store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,0, 0, 1, 0, 0, va_color,w, 0, 1, 1, 0, vb_color,w, h, 1, 1, 1, vc_color);
+  store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,0, 0, 1, 0, 0, va_color,0, h, 1, 0, 1, vb_color,w, h, 1, 1, 1, vc_color);
   
-  va_color = 0xF0F0F0F0;
-  vb_color = 0xF0F0F0F0;
-  vc_color = 0xF0F0F0F0;
+  va_color = 0x40404040;
+  vb_color = 0x40404040;
+  vc_color = 0x40404040;
   // // DST =  1 * DST + (DST) * SRC(=1)
   store_queue_ix = transfer_ta_global_polygon_quad_f(store_queue_ix, texture_address, uv, tsp_instruction_word::src_alpha_instr::other_color | tsp_instruction_word::dst_alpha_instr::one, false);
   store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,0, 0, 1, 0, 0, va_color,w, 0, 1, 1, 0, vb_color,w, h, 1, 1, 1, vc_color);
@@ -736,27 +736,27 @@ void transfer_ta_quad_dual(uint8_t shinniness, float w, float h, uint32_t textur
                                                 -ox, h+oy, 1, 0, 1, vb_color,
                                                 w+ox, h+oy, 1, 1, 1, vc_color);
 
-  store_queue_ix = transfer_ta_global_polygon_quad3(store_queue_ix, texture_address2, uv2);
-  store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,
-                                                -ox, -oy, 1, 0, 0, va_color,
-                                                w+ox, -oy, 1, 1, 0, vb_color,
-                                                w+ox, h+oy, 1, 1, 1, vc_color);
+  // store_queue_ix = transfer_ta_global_polygon_quad3(store_queue_ix, texture_address2, uv2);
+  // store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,
+  //                                               -ox, -oy, 1, 0, 0, va_color,
+  //                                               w+ox, -oy, 1, 1, 0, vb_color,
+  //                                               w+ox, h+oy, 1, 1, 1, vc_color);
                                                 
-  store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,
-                                                -ox, -oy, 1, 0, 0, va_color,
-                                                -ox, h+oy, 1, 0, 1, vb_color,
-                                                w+ox, h+oy, 1, 1, 1, vc_color);
+  // store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,
+  //                                               -ox, -oy, 1, 0, 0, va_color,
+  //                                               -ox, h+oy, 1, 0, 1, vb_color,
+  //                                               w+ox, h+oy, 1, 1, 1, vc_color);
 
-  store_queue_ix = transfer_ta_global_polygon_quad3(store_queue_ix, texture_address2, uv2);
-  store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,
-                                                -ox, -oy, 1, 0, 0, va_color,
-                                                w+ox, -oy, 1, 1, 0, vb_color,
-                                                w+ox, h+oy, 1, 1, 1, vc_color);
+  // store_queue_ix = transfer_ta_global_polygon_quad3(store_queue_ix, texture_address2, uv2);
+  // store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,
+  //                                               -ox, -oy, 1, 0, 0, va_color,
+  //                                               w+ox, -oy, 1, 1, 0, vb_color,
+  //                                               w+ox, h+oy, 1, 1, 1, vc_color);
                                                 
-  store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,
-                                                -ox, -oy, 1, 0, 0, va_color,
-                                                -ox, h+oy, 1, 0, 1, vb_color,
-                                                w+ox, h+oy, 1, 1, 1, vc_color);
+  // store_queue_ix = transfer_ta_vertex_triangle(store_queue_ix,
+  //                                               -ox, -oy, 1, 0, 0, va_color,
+  //                                               -ox, h+oy, 1, 0, 1, vb_color,
+  //                                               w+ox, h+oy, 1, 1, 1, vc_color);
 
   store_queue_ix = transfer_ta_global_polygon_quad0(store_queue_ix, texture_address, uv);
 
