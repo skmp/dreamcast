@@ -502,6 +502,7 @@ static float theta = 0;
 static uint8_t shinnyiness = 254;
 static int8_t shinnyiness_dir = 1;
 static float tonal_offset = 0.0f;
+uint16_t tonal_buffer[32*32];
 
 static inline vec3 vertex_rotate(vec3 v)
 {
@@ -1529,12 +1530,19 @@ int main()
         while (renders == v);
       }
 
+      // fast copy to cpu memory for tone mapping
+      auto* src = (volatile double*)(texture_memory64 + rtt_start_32tonal);
+      auto* dst = (volatile double*)tonal_buffer;
+      for (int i = 0; i < (32 * 32 * 2) / 8; i++) {
+        dst[i] = src[i];
+      }
+
       // do tone mapping
       uint32_t totalintensity = 0;
       uint16_t histogram[18] = { 0 };
       for (int y = 0; y < 32; y++) {
         for (int x = 0; x < 32; x++) {
-          uint16_t rgb565 = *((uint16_t*)(texture_memory64 + rtt_start_32tonal + (y * 32 + x) * 2));
+          uint16_t rgb565 = tonal_buffer[y * 32 + x];
           auto intensity = (((rgb565 >> 11) & 0x1F) + ((rgb565 >> 6) & 0x1F) + (rgb565 & 0x1F)) / 3;
           histogram[intensity]++;
           totalintensity += intensity;
